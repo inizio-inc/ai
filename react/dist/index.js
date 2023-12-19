@@ -568,7 +568,7 @@ async function processChatStream({
 
 // react/use-chat.ts
 var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, existingData, extraMetadataRef, messagesRef, abortControllerRef, generateId, onFinish, onResponse, sendExtraMessageFields) => {
-  var _a, _b;
+  var _a, _b, _c;
   const previousMessages = messagesRef.current;
   mutate(chatRequest.messages, false);
   const constructedMessagesPayload = sendExtraMessageFields ? chatRequest.messages : chatRequest.messages.map(({ role, content, name, function_call }) => ({
@@ -600,7 +600,9 @@ var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, exi
     try {
       const promise = api({
         messages: constructedMessagesPayload,
-        data: chatRequest.data
+        data: chatRequest.data,
+        ...extraMetadataRef.current.body,
+        ...(_a = chatRequest.options) == null ? void 0 : _a.body
       });
       await readRow(promise);
     } catch (e) {
@@ -618,7 +620,7 @@ var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, exi
     body: {
       data: chatRequest.data,
       ...extraMetadataRef.current.body,
-      ...(_a = chatRequest.options) == null ? void 0 : _a.body,
+      ...(_b = chatRequest.options) == null ? void 0 : _b.body,
       ...chatRequest.functions !== void 0 && {
         functions: chatRequest.functions
       },
@@ -629,7 +631,7 @@ var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, exi
     credentials: extraMetadataRef.current.credentials,
     headers: {
       ...extraMetadataRef.current.headers,
-      ...(_b = chatRequest.options) == null ? void 0 : _b.headers
+      ...(_c = chatRequest.options) == null ? void 0 : _c.headers
     },
     abortController: () => abortControllerRef.current,
     appendMessage(message) {
