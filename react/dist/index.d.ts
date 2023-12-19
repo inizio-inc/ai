@@ -345,9 +345,8 @@ type UseChatHelpers = {
 type StreamingReactResponseAction$1 = (payload: {
     messages: Message[];
     data?: Record<string, string>;
-    body?: Record<string, any>;
-}) => Promise<experimental_StreamingReactResponse>;
-declare function useChat({ api, id, initialMessages, initialInput, sendExtraMessageFields, experimental_onFunctionCall, onResponse, onFinish, onError, credentials, headers, body, generateId, }?: Omit<UseChatOptions, "api"> & {
+} & Record<string, any>) => Promise<experimental_StreamingReactResponse>;
+declare function useChat({ api, id, initialMessages, initialInput, sendExtraMessageFields, experimental_onFunctionCall, onResponse, onFinish, onError, credentials, headers, body, generateId, }?: Omit<UseChatOptions, 'api'> & {
     api?: string | StreamingReactResponseAction$1;
     key?: string;
 }): UseChatHelpers;

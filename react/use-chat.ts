@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import useSWR, { KeyedMutator } from "swr";
-import { callChatApi } from "../shared/call-chat-api";
-import { processChatStream } from "../shared/process-chat-stream";
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import useSWR, { KeyedMutator } from 'swr';
+import { callChatApi } from '../shared/call-chat-api';
+import { processChatStream } from '../shared/process-chat-stream';
 import type {
   ChatRequest,
   ChatRequestOptions,
@@ -10,12 +10,12 @@ import type {
   JSONValue,
   Message,
   UseChatOptions,
-} from "../shared/types";
-import { nanoid } from "../shared/utils";
+} from '../shared/types';
+import { nanoid } from '../shared/utils';
 import type {
   ReactResponseRow,
   experimental_StreamingReactResponse,
-} from "../streams/streaming-react-response";
+} from '../streams/streaming-react-response';
 export type { CreateMessage, Message, UseChatOptions };
 
 export type UseChatHelpers = {
@@ -31,7 +31,7 @@ export type UseChatHelpers = {
    */
   append: (
     message: Message | CreateMessage,
-    chatRequestOptions?: ChatRequestOptions
+    chatRequestOptions?: ChatRequestOptions,
   ) => Promise<string | null | undefined>;
   /**
    * Reload the last AI chat response for the given chat history. If the last
@@ -39,7 +39,7 @@ export type UseChatHelpers = {
    * new response.
    */
   reload: (
-    chatRequestOptions?: ChatRequestOptions
+    chatRequestOptions?: ChatRequestOptions,
   ) => Promise<string | null | undefined>;
   /**
    * Abort the current request immediately, keep the generated tokens if any.
@@ -59,12 +59,12 @@ export type UseChatHelpers = {
   handleInputChange: (
     e:
       | React.ChangeEvent<HTMLInputElement>
-      | React.ChangeEvent<HTMLTextAreaElement>
+      | React.ChangeEvent<HTMLTextAreaElement>,
   ) => void;
   /** Form submission handler to automatically reset input and append a user message  */
   handleSubmit: (
     e: React.FormEvent<HTMLFormElement>,
-    chatRequestOptions?: ChatRequestOptions
+    chatRequestOptions?: ChatRequestOptions,
   ) => void;
   metadata?: Object;
   /** Whether the API request is in progress */
@@ -73,11 +73,12 @@ export type UseChatHelpers = {
   data?: JSONValue[] | undefined;
 };
 
-type StreamingReactResponseAction = (payload: {
-  messages: Message[];
-  data?: Record<string, string>;
-  body?: Record<string, any>;
-}) => Promise<experimental_StreamingReactResponse>;
+type StreamingReactResponseAction = (
+  payload: {
+    messages: Message[];
+    data?: Record<string, string>;
+  } & Record<string, any>,
+) => Promise<experimental_StreamingReactResponse>;
 
 const getStreamedResponse = async (
   api: string | StreamingReactResponseAction,
@@ -91,7 +92,7 @@ const getStreamedResponse = async (
   generateId: IdGenerator,
   onFinish?: (message: Message) => void,
   onResponse?: (response: Response) => void | Promise<void>,
-  sendExtraMessageFields?: boolean
+  sendExtraMessageFields?: boolean,
 ) => {
   // Do an optimistic update to the chat state to show the updated messages
   // immediately.
@@ -109,7 +110,7 @@ const getStreamedResponse = async (
         }),
       }));
 
-  if (typeof api !== "string") {
+  if (typeof api !== 'string') {
     // In this case, we are handling a Server Action. No complex mode handling needed.
 
     const replyId = generateId();
@@ -117,16 +118,16 @@ const getStreamedResponse = async (
     let responseMessage: Message = {
       id: replyId,
       createdAt,
-      content: "",
-      role: "assistant",
+      content: '',
+      role: 'assistant',
     };
 
     async function readRow(promise: Promise<ReactResponseRow>) {
       const { content, ui, next } = await promise;
 
       // TODO: Handle function calls.
-      responseMessage["content"] = content;
-      responseMessage["ui"] = await ui;
+      responseMessage['content'] = content;
+      responseMessage['ui'] = await ui;
 
       mutate([...chatRequest.messages, { ...responseMessage }], false);
 
@@ -139,8 +140,6 @@ const getStreamedResponse = async (
       const promise = api({
         messages: constructedMessagesPayload as Message[],
         data: chatRequest.data,
-        ...extraMetadataRef.current.body,
-        ...chatRequest.options?.body,
       }) as Promise<ReactResponseRow>;
       await readRow(promise);
     } catch (e) {
@@ -193,10 +192,10 @@ const getStreamedResponse = async (
 };
 
 export function useChat({
-  api = "/api/chat",
+  api = '/api/chat',
   id,
   initialMessages,
-  initialInput = "",
+  initialInput = '',
   sendExtraMessageFields,
   experimental_onFunctionCall,
   onResponse,
@@ -206,14 +205,14 @@ export function useChat({
   headers,
   body,
   generateId = nanoid,
-}: Omit<UseChatOptions, "api"> & {
+}: Omit<UseChatOptions, 'api'> & {
   api?: string | StreamingReactResponseAction;
   key?: string;
 } = {}): UseChatHelpers {
   // Generate a unique id for the chat if not provided.
   const hookId = useId();
   const idKey = id ?? hookId;
-  const chatKey = typeof api === "string" ? [api, idKey] : idKey;
+  const chatKey = typeof api === 'string' ? [api, idKey] : idKey;
 
   // Store a empty array as the initial messages
   // (instead of using a default parameter value that gets re-created each time)
@@ -222,24 +221,24 @@ export function useChat({
 
   // Store the chat state in SWR, using the chatId as the key to share states.
   const { data: messages, mutate } = useSWR<Message[]>(
-    [chatKey, "messages"],
+    [chatKey, 'messages'],
     null,
-    { fallbackData: initialMessages ?? initialMessagesFallback }
+    { fallbackData: initialMessages ?? initialMessagesFallback },
   );
 
   // We store loading state in another hook to sync loading states across hook invocations
   const { data: isLoading = false, mutate: mutateLoading } = useSWR<boolean>(
-    [chatKey, "loading"],
-    null
+    [chatKey, 'loading'],
+    null,
   );
 
   const { data: streamData, mutate: mutateStreamData } = useSWR<
     JSONValue[] | undefined
-  >([chatKey, "streamData"], null);
+  >([chatKey, 'streamData'], null);
 
   const { data: error = undefined, mutate: setError } = useSWR<
     undefined | Error
-  >([chatKey, "error"], null);
+  >([chatKey, 'error'], null);
 
   // Keep the latest messages in a ref.
   const messagesRef = useRef<Message[]>(messages || []);
@@ -287,10 +286,10 @@ export function useChat({
               generateId,
               onFinish,
               onResponse,
-              sendExtraMessageFields
+              sendExtraMessageFields,
             ),
           experimental_onFunctionCall,
-          updateChatRequest: (chatRequestParam) => {
+          updateChatRequest: chatRequestParam => {
             chatRequest = chatRequestParam;
           },
           getCurrentMessages: () => messagesRef.current,
@@ -299,7 +298,7 @@ export function useChat({
         abortControllerRef.current = null;
       } catch (err) {
         // Ignore abort errors as they are expected.
-        if ((err as any).name === "AbortError") {
+        if ((err as any).name === 'AbortError') {
           abortControllerRef.current = null;
           return null;
         }
@@ -329,13 +328,13 @@ export function useChat({
       messagesRef,
       abortControllerRef,
       generateId,
-    ]
+    ],
   );
 
   const append = useCallback(
     async (
       message: Message | CreateMessage,
-      { options, functions, function_call, data }: ChatRequestOptions = {}
+      { options, functions, function_call, data }: ChatRequestOptions = {},
     ) => {
       if (!message.id) {
         message.id = generateId();
@@ -351,7 +350,7 @@ export function useChat({
 
       return triggerRequest(chatRequest);
     },
-    [triggerRequest, generateId]
+    [triggerRequest, generateId],
   );
 
   const reload = useCallback(
@@ -360,7 +359,7 @@ export function useChat({
 
       // Remove last assistant message and retry last user message.
       const lastMessage = messagesRef.current[messagesRef.current.length - 1];
-      if (lastMessage.role === "assistant") {
+      if (lastMessage.role === 'assistant') {
         const chatRequest: ChatRequest = {
           messages: messagesRef.current.slice(0, -1),
           options,
@@ -380,7 +379,7 @@ export function useChat({
 
       return triggerRequest(chatRequest);
     },
-    [triggerRequest]
+    [triggerRequest],
   );
 
   const stop = useCallback(() => {
@@ -395,7 +394,7 @@ export function useChat({
       mutate(messages, false);
       messagesRef.current = messages;
     },
-    [mutate]
+    [mutate],
   );
 
   // Input state and handlers.
@@ -405,7 +404,7 @@ export function useChat({
     (
       e: React.FormEvent<HTMLFormElement>,
       options: ChatRequestOptions = {},
-      metadata?: Object
+      metadata?: Object,
     ) => {
       if (metadata) {
         extraMetadataRef.current = {
@@ -420,14 +419,14 @@ export function useChat({
       append(
         {
           content: input,
-          role: "user",
+          role: 'user',
           createdAt: new Date(),
         },
-        options
+        options,
       );
-      setInput("");
+      setInput('');
     },
-    [input, append]
+    [input, append],
   );
 
   const handleInputChange = (e: any) => {
