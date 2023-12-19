@@ -140,6 +140,8 @@ const getStreamedResponse = async (
       const promise = api({
         messages: constructedMessagesPayload as Message[],
         data: chatRequest.data,
+        ...extraMetadataRef.current.body,
+        ...chatRequest.options?.body,
       }) as Promise<ReactResponseRow>;
       await readRow(promise);
     } catch (e) {
