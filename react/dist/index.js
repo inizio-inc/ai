@@ -918,16 +918,13 @@ async function callCompletionApi({
       }
     }
   } else {
-    const createdAt = /* @__PURE__ */ new Date();
     const decode = createChunkDecoder(false);
-    let streamedResponse = "";
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
         break;
       }
-      streamedResponse += decode(value);
-      result += streamedResponse;
+      result += decode(value);
       setCompletion(result);
       if ((abortController == null ? void 0 : abortController()) === null) {
         reader.cancel();
@@ -946,7 +943,7 @@ var getStreamedResponse2 = async (api, prompt, options, mutate, mutateStreamData
   if (typeof api !== "string") {
     let completion = "";
     async function readRow(promise2) {
-      const { content, ui, next } = await promise2;
+      const { content, ui, next, ...rest } = await promise2;
       completion = content;
       mutate(completion, false);
       if (next) {

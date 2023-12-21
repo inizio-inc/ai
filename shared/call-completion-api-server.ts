@@ -80,22 +80,15 @@ export async function callCompletionApi({
       }
     }
   } else {
-    const createdAt = new Date();
     const decode = createChunkDecoder(false);
 
-    // TODO-STREAMDATA: Remove this once Stream Data is not experimental
-    let streamedResponse = '';
-
-    // TODO-STREAMDATA: Remove this once Stream Data is not experimental
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
         break;
       }
-      // Update the chat state with the new message tokens.
-      streamedResponse += decode(value);
 
-      result += streamedResponse;
+      result += decode(value);
       setCompletion(result);
 
       // The request has been aborted, stop reading the stream.

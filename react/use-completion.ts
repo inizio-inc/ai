@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import useSWR, { KeyedMutator } from 'swr';
-import { callCompletionApi } from '../shared/call-completion-api-server';
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import useSWR, { KeyedMutator } from "swr";
+import { callCompletionApi } from "../shared/call-completion-api-server";
 import {
   IdGenerator,
   JSONValue,
   RequestOptions,
   UseCompletionOptions,
-} from '../shared/types';
+} from "../shared/types";
 import {
   ReactResponseRow,
   experimental_StreamingReactResponse,
-} from '../streams/streaming-react-response';
+} from "../streams/streaming-react-response";
 
 export type UseCompletionHelpers = {
   /** The current completion result */
@@ -20,7 +20,7 @@ export type UseCompletionHelpers = {
    */
   complete: (
     prompt: string,
-    options?: RequestOptions,
+    options?: RequestOptions
   ) => Promise<string | null | undefined>;
   /** The error object of the API request */
   error: undefined | Error;
@@ -46,7 +46,7 @@ export type UseCompletionHelpers = {
   handleInputChange: (
     e:
       | React.ChangeEvent<HTMLInputElement>
-      | React.ChangeEvent<HTMLTextAreaElement>,
+      | React.ChangeEvent<HTMLTextAreaElement>
   ) => void;
   /**
    * Form submission handler to automatically reset input and append a user message
@@ -79,14 +79,14 @@ const getStreamedResponse = async (
   extraMetadataRef: React.MutableRefObject<any>,
   abortControllerRef: React.MutableRefObject<AbortController | null>,
   onFinish?: (prompt: string, completion: string) => void,
-  onResponse?: (response: Response) => void | Promise<void>,
+  onResponse?: (response: Response) => void | Promise<void>
 ) => {
-  if (typeof api !== 'string') {
+  if (typeof api !== "string") {
     // In this case, we are handling a Server Action. No complex mode handling needed.
-    let completion = '';
+    let completion = "";
 
     async function readRow(promise: Promise<ReactResponseRow>) {
-      const { content, ui, next } = await promise;
+      const { content, next } = await promise;
 
       // TODO: Handle function calls.
       completion = content;
@@ -121,26 +121,26 @@ const getStreamedResponse = async (
       ...extraMetadataRef.current.body,
       ...options?.body,
     },
-    setCompletion: completion => mutate(completion, false),
+    setCompletion: (completion) => mutate(completion, false),
     abortController: () => abortControllerRef.current,
     onResponse,
     onFinish,
-    onData: data => {
+    onData: (data) => {
       mutateStreamData([...(existingData || []), ...(data || [])], false);
     },
   });
 };
 
-type UseCompletionOptionsServer = Omit<UseCompletionOptions, 'api'> & {
+type UseCompletionOptionsServer = Omit<UseCompletionOptions, "api"> & {
   api?: string | StreamingReactResponseAction;
   key?: string;
 };
 
 export function useCompletion({
-  api = '/api/completion',
+  api = "/api/completion",
   id,
-  initialCompletion = '',
-  initialInput = '',
+  initialCompletion = "",
+  initialInput = "",
   credentials,
   headers,
   body,
@@ -158,17 +158,17 @@ export function useCompletion({
   });
 
   const { data: isLoading = false, mutate: mutateLoading } = useSWR<boolean>(
-    [completionId, 'loading'],
-    null,
+    [completionId, "loading"],
+    null
   );
 
   const { data: streamData, mutate: mutateStreamData } = useSWR<
     JSONValue[] | undefined
-  >([completionId, 'streamData'], null);
+  >([completionId, "streamData"], null);
 
   const { data: error = undefined, mutate: setError } = useSWR<
     undefined | Error
-  >([completionId, 'error'], null);
+  >([completionId, "error"], null);
 
   const completion = data!;
 
@@ -207,13 +207,13 @@ export function useCompletion({
           extraMetadataRef,
           abortControllerRef,
           onFinish,
-          onResponse,
+          onResponse
         );
 
         abortControllerRef.current = null;
       } catch (err) {
         // Ignore abort errors as they are expected.
-        if ((err as any).name === 'AbortError') {
+        if ((err as any).name === "AbortError") {
           abortControllerRef.current = null;
           return null;
         }
@@ -239,7 +239,7 @@ export function useCompletion({
       setError,
       streamData,
       mutateStreamData,
-    ],
+    ]
   );
 
   const stop = useCallback(() => {
@@ -253,14 +253,14 @@ export function useCompletion({
     (completion: string) => {
       mutate(completion, false);
     },
-    [mutate],
+    [mutate]
   );
 
-  const complete = useCallback<UseCompletionHelpers['complete']>(
+  const complete = useCallback<UseCompletionHelpers["complete"]>(
     async (prompt, options) => {
       return triggerRequest(prompt, options);
     },
-    [triggerRequest],
+    [triggerRequest]
   );
 
   const [input, setInput] = useState(initialInput);
@@ -271,7 +271,7 @@ export function useCompletion({
       if (!input) return;
       return complete(input);
     },
-    [input, complete],
+    [input, complete]
   );
 
   const handleInputChange = (e: any) => {
