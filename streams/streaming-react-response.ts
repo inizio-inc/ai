@@ -18,6 +18,8 @@ type UINode = string | JSX.Element | JSX.Element[] | null | undefined;
 type Payload = {
   ui: UINode | Promise<UINode>;
   content: string;
+  status?: 'ok' | 'error';
+  error?: string;
 };
 
 export type ReactResponseRow = Payload & {

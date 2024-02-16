@@ -71,7 +71,7 @@ type IdGenerator = () => string;
 /**
  * Shared types between the API and UI packages.
  */
-interface Message {
+interface Message$1 {
     id: string;
     tool_call_id?: string;
     createdAt?: Date;
@@ -95,12 +95,16 @@ interface Message {
      * the tool call name and arguments. Otherwise, the field should not be set.
      */
     tool_calls?: string | ToolCall[];
+    /**
+     * Additional message-specific information added on the server via StreamData
+     */
+    annotations?: JSONValue[] | undefined;
 }
-type CreateMessage = Omit<Message, 'id'> & {
-    id?: Message['id'];
+type CreateMessage = Omit<Message$1, 'id'> & {
+    id?: Message$1['id'];
 };
 type ChatRequest = {
-    messages: Message[];
+    messages: Message$1[];
     options?: RequestOptions;
     functions?: Array<Function>;
     function_call?: FunctionCall;
@@ -108,8 +112,8 @@ type ChatRequest = {
     tools?: Array<Tool>;
     tool_choice?: ToolChoice;
 };
-type FunctionCallHandler = (chatMessages: Message[], functionCall: FunctionCall) => Promise<ChatRequest | void>;
-type ToolCallHandler = (chatMessages: Message[], toolCalls: ToolCall[]) => Promise<ChatRequest | void>;
+type FunctionCallHandler = (chatMessages: Message$1[], functionCall: FunctionCall) => Promise<ChatRequest | void>;
+type ToolCallHandler = (chatMessages: Message$1[], toolCalls: ToolCall[]) => Promise<ChatRequest | void>;
 type RequestOptions = {
     headers?: Record<string, string> | Headers;
     body?: object;
@@ -137,7 +141,7 @@ type UseChatOptions = {
     /**
      * Initial messages of the chat. Useful to load an existing chat history.
      */
-    initialMessages?: Message[];
+    initialMessages?: Message$1[];
     /**
      * Initial input of the chat.
      */
@@ -161,7 +165,7 @@ type UseChatOptions = {
     /**
      * Callback function to be called when the chat is finished streaming.
      */
-    onFinish?: (message: Message) => void;
+    onFinish?: (message: Message$1) => void;
     /**
      * Callback function to be called when an error is encountered.
      */
@@ -276,75 +280,40 @@ type DataMessage = {
     data: JSONValue;
 };
 
-interface StreamPart<CODE extends string, NAME extends string, TYPE> {
-    code: CODE;
-    name: NAME;
-    parse: (value: JSONValue) => {
-        type: NAME;
-        value: TYPE;
-    };
+declare interface AzureChatCompletions {
+    id: string;
+    created: Date;
+    choices: AzureChatChoice[];
+    systemFingerprint?: string;
+    usage?: AzureCompletionsUsage;
+    promptFilterResults: any[];
 }
-declare const textStreamPart: StreamPart<'0', 'text', string>;
-declare const functionCallStreamPart: StreamPart<'1', 'function_call', {
-    function_call: FunctionCall;
-}>;
-declare const dataStreamPart: StreamPart<'2', 'data', Array<JSONValue>>;
-declare const errorStreamPart: StreamPart<'3', 'error', string>;
-declare const assistantMessageStreamPart: StreamPart<'4', 'assistant_message', AssistantMessage>;
-declare const assistantControlDataStreamPart: StreamPart<'5', 'assistant_control_data', {
-    threadId: string;
-    messageId: string;
-}>;
-declare const dataMessageStreamPart: StreamPart<'6', 'data_message', DataMessage>;
-declare const toolCallStreamPart: StreamPart<'7', 'tool_calls', {
-    tool_calls: ToolCall[];
-}>;
-type StreamPartType = ReturnType<typeof textStreamPart.parse> | ReturnType<typeof functionCallStreamPart.parse> | ReturnType<typeof dataStreamPart.parse> | ReturnType<typeof errorStreamPart.parse> | ReturnType<typeof assistantMessageStreamPart.parse> | ReturnType<typeof assistantControlDataStreamPart.parse> | ReturnType<typeof dataMessageStreamPart.parse> | ReturnType<typeof toolCallStreamPart.parse>;
-/**
- * The map of prefixes for data in the stream
- *
- * - 0: Text from the LLM response
- * - 1: (OpenAI) function_call responses
- * - 2: custom JSON added by the user using `Data`
- * - 6: (OpenAI) tool_call responses
- *
- * Example:
- * ```
- * 0:Vercel
- * 0:'s
- * 0: AI
- * 0: AI
- * 0: SDK
- * 0: is great
- * 0:!
- * 2: { "someJson": "value" }
- * 1: {"function_call": {"name": "get_current_weather", "arguments": "{\\n\\"location\\": \\"Charlottesville, Virginia\\",\\n\\"format\\": \\"celsius\\"\\n}"}}
- * 6: {"tool_call": {"id": "tool_0", "type": "function", "function": {"name": "get_current_weather", "arguments": "{\\n\\"location\\": \\"Charlottesville, Virginia\\",\\n\\"format\\": \\"celsius\\"\\n}"}}}
- *```
- */
-declare const StreamStringPrefixes: {
-    readonly text: "0";
-    readonly function_call: "1";
-    readonly data: "2";
-    readonly error: "3";
-    readonly assistant_message: "4";
-    readonly assistant_control_data: "5";
-    readonly data_message: "6";
-    readonly tool_calls: "7";
-};
-
-declare const nanoid: (size?: number | undefined) => string;
-declare function createChunkDecoder(): (chunk: Uint8Array | undefined) => string;
-declare function createChunkDecoder(complex: false): (chunk: Uint8Array | undefined) => string;
-declare function createChunkDecoder(complex: true): (chunk: Uint8Array | undefined) => StreamPartType[];
-declare function createChunkDecoder(complex?: boolean): (chunk: Uint8Array | undefined) => StreamPartType[] | string;
-
-declare const isStreamStringEqualToType: (type: keyof typeof StreamStringPrefixes, value: string) => value is `0:${string}\n` | `1:${string}\n` | `2:${string}\n` | `3:${string}\n` | `4:${string}\n` | `5:${string}\n` | `6:${string}\n` | `7:${string}\n`;
-type StreamString = `${(typeof StreamStringPrefixes)[keyof typeof StreamStringPrefixes]}:${string}\n`;
-/**
- * A header sent to the client so it knows how to handle parsing the stream (as a deprecated text response or using the new prefixed protocol)
- */
-declare const COMPLEX_HEADER = "X-Experimental-Stream-Data";
+declare interface AzureChatChoice {
+    message?: AzureChatResponseMessage;
+    index: number;
+    finishReason: string | null;
+    delta?: AzureChatResponseMessage;
+}
+declare interface AzureChatResponseMessage {
+    role: string;
+    content: string | null;
+    toolCalls: AzureChatCompletionsFunctionToolCall[];
+    functionCall?: AzureFunctionCall;
+}
+declare interface AzureCompletionsUsage {
+    completionTokens: number;
+    promptTokens: number;
+    totalTokens: number;
+}
+declare interface AzureFunctionCall {
+    name: string;
+    arguments: string;
+}
+declare interface AzureChatCompletionsFunctionToolCall {
+    type: 'function';
+    function: AzureFunctionCall;
+    id: string;
+}
 
 type OpenAIStreamCallbacks = AIStreamCallbacksAndOptions & {
     /**
@@ -530,7 +499,7 @@ interface CompletionUsage {
      */
     total_tokens: number;
 }
-type AsyncIterableOpenAIStreamReturnTypes = AsyncIterable<ChatCompletionChunk> | AsyncIterable<Completion>;
+type AsyncIterableOpenAIStreamReturnTypes = AsyncIterable<ChatCompletionChunk> | AsyncIterable<Completion> | AsyncIterable<AzureChatCompletions>;
 declare function OpenAIStream(res: Response | AsyncIterableOpenAIStreamReturnTypes, callbacks?: OpenAIStreamCallbacks): ReadableStream;
 
 interface FunctionCallPayload {
@@ -569,11 +538,22 @@ interface AIStreamCallbacksAndOptions {
     experimental_streamData?: boolean;
 }
 /**
+ * Options for the AIStreamParser.
+ * @interface
+ * @property {string} event - The event (type) from the server side event stream.
+ */
+interface AIStreamParserOptions {
+    event?: string;
+}
+/**
  * Custom parser for AIStream data.
  * @interface
+ * @param {string} data - The data to be parsed.
+ * @param {AIStreamParserOptions} options - The options for the parser.
+ * @returns {string | void} The parsed data or void.
  */
 interface AIStreamParser {
-    (data: string): string | void;
+    (data: string, options: AIStreamParserOptions): string | void;
 }
 /**
  * Creates a TransformStream that parses events from an EventSource stream using a custom parser.
@@ -645,6 +625,63 @@ declare function AIStream(response: Response, customParser?: AIStreamParser, cal
  */
 declare function readableFromAsyncIterable<T>(iterable: AsyncIterable<T>): ReadableStream<T>;
 
+interface AWSBedrockResponse {
+    body?: AsyncIterable<{
+        chunk?: {
+            bytes?: Uint8Array;
+        };
+    }>;
+}
+declare function AWSBedrockAnthropicStream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+declare function AWSBedrockCohereStream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+declare function AWSBedrockLlama2Stream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+declare function AWSBedrockStream(response: AWSBedrockResponse, callbacks: AIStreamCallbacksAndOptions | undefined, extractTextDeltaFromChunk: (chunk: any) => string): ReadableStream<any>;
+
+/**
+ * A stream wrapper to send custom JSON-encoded data back to the client.
+ */
+declare class experimental_StreamData {
+    private encoder;
+    private controller;
+    stream: TransformStream<Uint8Array, Uint8Array>;
+    private isClosedPromise;
+    private isClosedPromiseResolver;
+    private isClosed;
+    private data;
+    private messageAnnotations;
+    constructor();
+    close(): Promise<void>;
+    append(value: JSONValue): void;
+    appendMessageAnnotation(value: JSONValue): void;
+}
+/**
+ * A TransformStream for LLMs that do not have their own transform stream handlers managing encoding (e.g. OpenAIStream has one for function call handling).
+ * This assumes every chunk is a 'text' chunk.
+ */
+declare function createStreamDataTransformer(experimental_streamData: boolean | undefined): TransformStream<any, any>;
+
+/**
+ * A utility class for streaming text responses.
+ */
+declare class StreamingTextResponse extends Response {
+    constructor(res: ReadableStream, init?: ResponseInit, data?: experimental_StreamData);
+}
+/**
+ * A utility function to stream a ReadableStream to a Node.js response-like object.
+ */
+declare function streamToResponse(res: ReadableStream, response: ServerResponse, init?: {
+    headers?: Record<string, string>;
+    status?: number;
+}): void;
+
+declare function HuggingFaceStream(res: AsyncGenerator<any>, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+
+interface StreamChunk {
+    text?: string;
+    eventType: 'stream-start' | 'search-queries-generation' | 'search-results' | 'text-generation' | 'citation-generation' | 'stream-end';
+}
+declare function CohereStream(reader: Response | AsyncIterable<StreamChunk>, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+
 interface CompletionChunk {
     /**
      * The resulting completion up to and excluding the stop sequences.
@@ -665,63 +702,70 @@ interface CompletionChunk {
      */
     stop_reason: string;
 }
+interface Message {
+    id: string;
+    content: Array<ContentBlock>;
+    model: string;
+    role: 'assistant';
+    stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence' | null;
+    stop_sequence: string | null;
+    type: 'message';
+}
+interface ContentBlock {
+    text: string;
+    type: 'text';
+}
+interface TextDelta {
+    text: string;
+    type: 'text_delta';
+}
+interface ContentBlockDeltaEvent {
+    delta: TextDelta;
+    index: number;
+    type: 'content_block_delta';
+}
+interface ContentBlockStartEvent {
+    content_block: ContentBlock;
+    index: number;
+    type: 'content_block_start';
+}
+interface ContentBlockStopEvent {
+    index: number;
+    type: 'content_block_stop';
+}
+interface MessageDeltaEventDelta {
+    stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence' | null;
+    stop_sequence: string | null;
+}
+interface MessageDeltaEvent {
+    delta: MessageDeltaEventDelta;
+    type: 'message_delta';
+}
+type MessageStreamEvent = MessageStartEvent | MessageDeltaEvent | MessageStopEvent | ContentBlockStartEvent | ContentBlockDeltaEvent | ContentBlockStopEvent;
+interface MessageStartEvent {
+    message: Message;
+    type: 'message_start';
+}
+interface MessageStopEvent {
+    type: 'message_stop';
+}
 /**
  * Accepts either a fetch Response from the Anthropic `POST /v1/complete` endpoint,
  * or the return value of `await client.completions.create({ stream: true })`
  * from the `@anthropic-ai/sdk` package.
  */
-declare function AnthropicStream(res: Response | AsyncIterable<CompletionChunk>, cb?: AIStreamCallbacksAndOptions): ReadableStream;
+declare function AnthropicStream(res: Response | AsyncIterable<CompletionChunk> | AsyncIterable<MessageStreamEvent>, cb?: AIStreamCallbacksAndOptions): ReadableStream;
 
-type AssistantResponseSettings = {
-    threadId: string;
-    messageId: string;
+type InkeepOnFinalMetadata = {
+    chat_session_id: string;
+    records_cited: any;
 };
-type AssistantResponseCallback = (stream: {
-    threadId: string;
-    messageId: string;
-    sendMessage: (message: AssistantMessage) => void;
-    sendDataMessage: (message: DataMessage) => void;
-}) => Promise<void>;
-declare function experimental_AssistantResponse({ threadId, messageId }: AssistantResponseSettings, process: AssistantResponseCallback): Response;
-
-interface AWSBedrockResponse {
-    body?: AsyncIterable<{
-        chunk?: {
-            bytes?: Uint8Array;
-        };
-    }>;
-}
-declare function AWSBedrockAnthropicStream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
-declare function AWSBedrockCohereStream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
-declare function AWSBedrockLlama2Stream(response: AWSBedrockResponse, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
-declare function AWSBedrockStream(response: AWSBedrockResponse, callbacks: AIStreamCallbacksAndOptions | undefined, extractTextDeltaFromChunk: (chunk: any) => string): ReadableStream<any>;
-
-declare function CohereStream(reader: Response, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
-
-interface GenerateContentResponse {
-    candidates?: GenerateContentCandidate[];
-}
-interface GenerateContentCandidate {
-    index: number;
-    content: Content;
-}
-interface Content {
-    role: string;
-    parts: Part[];
-}
-type Part = TextPart | InlineDataPart;
-interface InlineDataPart {
-    text?: never;
-}
-interface TextPart {
-    text: string;
-    inlineData?: never;
-}
-declare function GoogleGenerativeAIStream(response: {
-    stream: AsyncIterable<GenerateContentResponse>;
-}, cb?: AIStreamCallbacksAndOptions): ReadableStream;
-
-declare function HuggingFaceStream(res: AsyncGenerator<any>, callbacks?: AIStreamCallbacksAndOptions): ReadableStream;
+type InkeepChatResultCallbacks = {
+    onFinal?: (completion: string, metadata?: InkeepOnFinalMetadata) => Promise<void> | void;
+    onRecordsCited?: (records_cited: InkeepOnFinalMetadata['records_cited']) => void;
+};
+type InkeepAIStreamCallbacksAndOptions = AIStreamCallbacksAndOptions & InkeepChatResultCallbacks;
+declare function InkeepStream(res: Response, callbacks?: InkeepAIStreamCallbacksAndOptions): ReadableStream;
 
 declare function LangChainStream(callbacks?: AIStreamCallbacksAndOptions): {
     stream: ReadableStream<any>;
@@ -786,26 +830,112 @@ declare function ReplicateStream(res: Prediction, cb?: AIStreamCallbacksAndOptio
     headers?: Record<string, string>;
 }): Promise<ReadableStream>;
 
-/**
- * A stream wrapper to send custom JSON-encoded data back to the client.
- */
-declare class experimental_StreamData {
-    private encoder;
-    private controller;
-    stream: TransformStream<Uint8Array, Uint8Array>;
-    private isClosedPromise;
-    private isClosedPromiseResolver;
-    private isClosed;
-    private data;
-    constructor();
-    close(): Promise<void>;
-    append(value: JSONValue): void;
+interface StreamPart<CODE extends string, NAME extends string, TYPE> {
+    code: CODE;
+    name: NAME;
+    parse: (value: JSONValue) => {
+        type: NAME;
+        value: TYPE;
+    };
 }
+declare const textStreamPart: StreamPart<'0', 'text', string>;
+declare const functionCallStreamPart: StreamPart<'1', 'function_call', {
+    function_call: FunctionCall;
+}>;
+declare const dataStreamPart: StreamPart<'2', 'data', Array<JSONValue>>;
+declare const errorStreamPart: StreamPart<'3', 'error', string>;
+declare const assistantMessageStreamPart: StreamPart<'4', 'assistant_message', AssistantMessage>;
+declare const assistantControlDataStreamPart: StreamPart<'5', 'assistant_control_data', {
+    threadId: string;
+    messageId: string;
+}>;
+declare const dataMessageStreamPart: StreamPart<'6', 'data_message', DataMessage>;
+declare const toolCallStreamPart: StreamPart<'7', 'tool_calls', {
+    tool_calls: ToolCall[];
+}>;
+declare const messageAnnotationsStreamPart: StreamPart<'8', 'message_annotations', Array<JSONValue>>;
+type StreamPartType = ReturnType<typeof textStreamPart.parse> | ReturnType<typeof functionCallStreamPart.parse> | ReturnType<typeof dataStreamPart.parse> | ReturnType<typeof errorStreamPart.parse> | ReturnType<typeof assistantMessageStreamPart.parse> | ReturnType<typeof assistantControlDataStreamPart.parse> | ReturnType<typeof dataMessageStreamPart.parse> | ReturnType<typeof toolCallStreamPart.parse> | ReturnType<typeof messageAnnotationsStreamPart.parse>;
 /**
- * A TransformStream for LLMs that do not have their own transform stream handlers managing encoding (e.g. OpenAIStream has one for function call handling).
- * This assumes every chunk is a 'text' chunk.
+ * The map of prefixes for data in the stream
+ *
+ * - 0: Text from the LLM response
+ * - 1: (OpenAI) function_call responses
+ * - 2: custom JSON added by the user using `Data`
+ * - 6: (OpenAI) tool_call responses
+ *
+ * Example:
+ * ```
+ * 0:Vercel
+ * 0:'s
+ * 0: AI
+ * 0: AI
+ * 0: SDK
+ * 0: is great
+ * 0:!
+ * 2: { "someJson": "value" }
+ * 1: {"function_call": {"name": "get_current_weather", "arguments": "{\\n\\"location\\": \\"Charlottesville, Virginia\\",\\n\\"format\\": \\"celsius\\"\\n}"}}
+ * 6: {"tool_call": {"id": "tool_0", "type": "function", "function": {"name": "get_current_weather", "arguments": "{\\n\\"location\\": \\"Charlottesville, Virginia\\",\\n\\"format\\": \\"celsius\\"\\n}"}}}
+ *```
  */
-declare function createStreamDataTransformer(experimental_streamData: boolean | undefined): TransformStream<any, any>;
+declare const StreamStringPrefixes: {
+    readonly text: "0";
+    readonly function_call: "1";
+    readonly data: "2";
+    readonly error: "3";
+    readonly assistant_message: "4";
+    readonly assistant_control_data: "5";
+    readonly data_message: "6";
+    readonly tool_calls: "7";
+    readonly message_annotations: "8";
+};
+
+declare const nanoid: (size?: number | undefined) => string;
+declare function createChunkDecoder(): (chunk: Uint8Array | undefined) => string;
+declare function createChunkDecoder(complex: false): (chunk: Uint8Array | undefined) => string;
+declare function createChunkDecoder(complex: true): (chunk: Uint8Array | undefined) => StreamPartType[];
+declare function createChunkDecoder(complex?: boolean): (chunk: Uint8Array | undefined) => StreamPartType[] | string;
+
+declare const isStreamStringEqualToType: (type: keyof typeof StreamStringPrefixes, value: string) => value is `0:${string}\n` | `1:${string}\n` | `2:${string}\n` | `3:${string}\n` | `4:${string}\n` | `5:${string}\n` | `6:${string}\n` | `7:${string}\n` | `8:${string}\n`;
+type StreamString = `${(typeof StreamStringPrefixes)[keyof typeof StreamStringPrefixes]}:${string}\n`;
+/**
+ * A header sent to the client so it knows how to handle parsing the stream (as a deprecated text response or using the new prefixed protocol)
+ */
+declare const COMPLEX_HEADER = "X-Experimental-Stream-Data";
+
+type AssistantResponseSettings = {
+    threadId: string;
+    messageId: string;
+};
+type AssistantResponseCallback = (stream: {
+    threadId: string;
+    messageId: string;
+    sendMessage: (message: AssistantMessage) => void;
+    sendDataMessage: (message: DataMessage) => void;
+}) => Promise<void>;
+declare function experimental_AssistantResponse({ threadId, messageId }: AssistantResponseSettings, process: AssistantResponseCallback): Response;
+
+interface GenerateContentResponse {
+    candidates?: GenerateContentCandidate[];
+}
+interface GenerateContentCandidate {
+    index: number;
+    content: Content;
+}
+interface Content {
+    role: string;
+    parts: Part[];
+}
+type Part = TextPart | InlineDataPart;
+interface InlineDataPart {
+    text?: never;
+}
+interface TextPart {
+    text: string;
+    inlineData?: never;
+}
+declare function GoogleGenerativeAIStream(response: {
+    stream: AsyncIterable<GenerateContentResponse>;
+}, cb?: AIStreamCallbacksAndOptions): ReadableStream;
 
 /**
  * This is a naive implementation of the streaming React response API.
@@ -821,6 +951,8 @@ type UINode = string | JSX.Element | JSX.Element[] | null | undefined;
 type Payload = {
     ui: UINode | Promise<UINode>;
     content: string;
+    status?: 'ok' | 'error';
+    error?: string;
 };
 type ReactResponseRow = Payload & {
     next: null | Promise<ReactResponseRow>;
@@ -839,18 +971,4 @@ declare class experimental_StreamingReactResponse {
     });
 }
 
-/**
- * A utility class for streaming text responses.
- */
-declare class StreamingTextResponse extends Response {
-    constructor(res: ReadableStream, init?: ResponseInit, data?: experimental_StreamData);
-}
-/**
- * A utility function to stream a ReadableStream to a Node.js response-like object.
- */
-declare function streamToResponse(res: ReadableStream, response: ServerResponse, init?: {
-    headers?: Record<string, string>;
-    status?: number;
-}): void;
-
-export { AIStream, AIStreamCallbacksAndOptions, AIStreamParser, AWSBedrockAnthropicStream, AWSBedrockCohereStream, AWSBedrockLlama2Stream, AWSBedrockStream, AnthropicStream, AssistantMessage, COMPLEX_HEADER, ChatRequest, ChatRequestOptions, CohereStream, CompletionUsage, CreateMessage, DataMessage, Function, FunctionCall, FunctionCallHandler, FunctionCallPayload, GoogleGenerativeAIStream, HuggingFaceStream, IdGenerator, JSONValue, LangChainStream, Message, OpenAIStream, OpenAIStreamCallbacks, ReactResponseRow, ReplicateStream, RequestOptions, StreamString, StreamingTextResponse, Tool, ToolCall, ToolCallHandler, ToolCallPayload, ToolChoice, UseChatOptions, UseCompletionOptions, createCallbacksTransformer, createChunkDecoder, createEventStreamTransformer, createStreamDataTransformer, experimental_AssistantResponse, experimental_StreamData, experimental_StreamingReactResponse, isStreamStringEqualToType, nanoid, readableFromAsyncIterable, streamToResponse, trimStartOfStreamHelper };
+export { AIStream, AIStreamCallbacksAndOptions, AIStreamParser, AIStreamParserOptions, AWSBedrockAnthropicStream, AWSBedrockCohereStream, AWSBedrockLlama2Stream, AWSBedrockStream, AnthropicStream, AssistantMessage, COMPLEX_HEADER, ChatRequest, ChatRequestOptions, CohereStream, CompletionUsage, CreateMessage, DataMessage, Function, FunctionCall, FunctionCallHandler, FunctionCallPayload, GoogleGenerativeAIStream, HuggingFaceStream, IdGenerator, InkeepAIStreamCallbacksAndOptions, InkeepChatResultCallbacks, InkeepOnFinalMetadata, InkeepStream, JSONValue, LangChainStream, Message$1 as Message, OpenAIStream, OpenAIStreamCallbacks, ReactResponseRow, ReplicateStream, RequestOptions, StreamString, StreamingTextResponse, Tool, ToolCall, ToolCallHandler, ToolCallPayload, ToolChoice, UseChatOptions, UseCompletionOptions, createCallbacksTransformer, createChunkDecoder, createEventStreamTransformer, createStreamDataTransformer, experimental_AssistantResponse, experimental_StreamData, experimental_StreamingReactResponse, isStreamStringEqualToType, nanoid, readableFromAsyncIterable, streamToResponse, trimStartOfStreamHelper };

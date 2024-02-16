@@ -19,6 +19,8 @@ export class experimental_StreamData {
 
   // array to store appended data
   private data: JSONValue[] = [];
+  private messageAnnotations: JSONValue[] = [];
+
   constructor() {
     this.isClosedPromise = new Promise(resolve => {
       this.isClosedPromiseResolver = resolve;
@@ -37,6 +39,14 @@ export class experimental_StreamData {
           );
           self.data = [];
           controller.enqueue(encodedData);
+        }
+
+        if (self.messageAnnotations.length) {
+          const encodedMessageAnnotations = self.encoder.encode(
+            formatStreamPart('message_annotations', self.messageAnnotations),
+          );
+          self.messageAnnotations = [];
+          controller.enqueue(encodedMessageAnnotations);
         }
 
         controller.enqueue(chunk);
@@ -64,6 +74,13 @@ export class experimental_StreamData {
           );
           controller.enqueue(encodedData);
         }
+
+        if (self.messageAnnotations.length) {
+          const encodedData = self.encoder.encode(
+            formatStreamPart('message_annotations', self.messageAnnotations),
+          );
+          controller.enqueue(encodedData);
+        }
       },
     });
   }
@@ -87,6 +104,14 @@ export class experimental_StreamData {
     }
 
     this.data.push(value);
+  }
+
+  appendMessageAnnotation(value: JSONValue): void {
+    if (this.isClosed) {
+      throw new Error('Data Stream has already been closed.');
+    }
+
+    this.messageAnnotations.push(value);
   }
 }
 

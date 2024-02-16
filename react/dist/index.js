@@ -154,6 +154,16 @@ var toolCallStreamPart = {
     };
   }
 };
+var messageAnnotationsStreamPart = {
+  code: "8",
+  name: "message_annotations",
+  parse: (value) => {
+    if (!Array.isArray(value)) {
+      throw new Error('"message_annotations" parts expect an array value.');
+    }
+    return { type: "message_annotations", value };
+  }
+};
 var streamParts = [
   textStreamPart,
   functionCallStreamPart,
@@ -162,7 +172,8 @@ var streamParts = [
   assistantMessageStreamPart,
   assistantControlDataStreamPart,
   dataMessageStreamPart,
-  toolCallStreamPart
+  toolCallStreamPart,
+  messageAnnotationsStreamPart
 ];
 var streamPartsByCode = {
   [textStreamPart.code]: textStreamPart,
@@ -172,7 +183,8 @@ var streamPartsByCode = {
   [assistantMessageStreamPart.code]: assistantMessageStreamPart,
   [assistantControlDataStreamPart.code]: assistantControlDataStreamPart,
   [dataMessageStreamPart.code]: dataMessageStreamPart,
-  [toolCallStreamPart.code]: toolCallStreamPart
+  [toolCallStreamPart.code]: toolCallStreamPart,
+  [messageAnnotationsStreamPart.code]: messageAnnotationsStreamPart
 };
 var StreamStringPrefixes = {
   [textStreamPart.name]: textStreamPart.code,
@@ -182,7 +194,8 @@ var StreamStringPrefixes = {
   [assistantMessageStreamPart.name]: assistantMessageStreamPart.code,
   [assistantControlDataStreamPart.name]: assistantControlDataStreamPart.code,
   [dataMessageStreamPart.name]: dataMessageStreamPart.code,
-  [toolCallStreamPart.name]: toolCallStreamPart.code
+  [toolCallStreamPart.name]: toolCallStreamPart.code,
+  [messageAnnotationsStreamPart.name]: messageAnnotationsStreamPart.code
 };
 var validCodes = streamParts.map((part) => part.code);
 var parseStreamPart = (line) => {
@@ -266,6 +279,11 @@ function createChunkDecoder(complex) {
 var COMPLEX_HEADER = "X-Experimental-Stream-Data";
 
 // shared/parse-complex-response.ts
+function assignAnnotationsToMessage(message, annotations) {
+  if (!message || !annotations || !annotations.length)
+    return message;
+  return { ...message, annotations: [...annotations] };
+}
 async function parseComplexResponse({
   reader,
   abortControllerRef,
@@ -278,6 +296,7 @@ async function parseComplexResponse({
   const prefixMap = {
     data: []
   };
+  let message_annotations = void 0;
   for await (const { type, value } of readDataStream(reader, {
     isAborted: () => (abortControllerRef == null ? void 0 : abortControllerRef.current) === null
   })) {
@@ -322,12 +341,41 @@ async function parseComplexResponse({
     if (type === "data") {
       prefixMap["data"].push(...value);
     }
-    const responseMessage = prefixMap["text"];
-    const merged = [
-      functionCallMessage,
-      toolCallMessage,
-      responseMessage
-    ].filter(Boolean);
+    let responseMessage = prefixMap["text"];
+    if (type === "message_annotations") {
+      if (!message_annotations) {
+        message_annotations = [...value];
+      } else {
+        message_annotations.push(...value);
+      }
+      functionCallMessage = assignAnnotationsToMessage(
+        prefixMap["function_call"],
+        message_annotations
+      );
+      toolCallMessage = assignAnnotationsToMessage(
+        prefixMap["tool_calls"],
+        message_annotations
+      );
+      responseMessage = assignAnnotationsToMessage(
+        prefixMap["text"],
+        message_annotations
+      );
+    }
+    if (message_annotations == null ? void 0 : message_annotations.length) {
+      const messagePrefixKeys = [
+        "text",
+        "function_call",
+        "tool_calls"
+      ];
+      messagePrefixKeys.forEach((key) => {
+        if (prefixMap[key]) {
+          prefixMap[key].annotations = [...message_annotations];
+        }
+      });
+    }
+    const merged = [functionCallMessage, toolCallMessage, responseMessage].filter(Boolean).map((message) => ({
+      ...assignAnnotationsToMessage(message, message_annotations)
+    }));
     update(merged, [...prefixMap["data"]]);
   }
   onFinish == null ? void 0 : onFinish(prefixMap);
@@ -571,14 +619,20 @@ var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, exi
   var _a, _b, _c;
   const previousMessages = messagesRef.current;
   mutate(chatRequest.messages, false);
-  const constructedMessagesPayload = sendExtraMessageFields ? chatRequest.messages : chatRequest.messages.map(({ role, content, name, function_call }) => ({
-    role,
-    content,
-    ...name !== void 0 && { name },
-    ...function_call !== void 0 && {
-      function_call
-    }
-  }));
+  const constructedMessagesPayload = sendExtraMessageFields ? chatRequest.messages : chatRequest.messages.map(
+    ({ role, content, name, function_call, tool_calls, tool_call_id }) => ({
+      role,
+      content,
+      tool_call_id,
+      ...name !== void 0 && { name },
+      ...function_call !== void 0 && {
+        function_call
+      },
+      ...tool_calls !== void 0 && {
+        tool_calls
+      }
+    })
+  );
   if (typeof api !== "string") {
     const replyId = generateId();
     const createdAt = /* @__PURE__ */ new Date();
@@ -626,6 +680,12 @@ var getStreamedResponse = async (api, chatRequest, mutate, mutateStreamData, exi
       },
       ...chatRequest.function_call !== void 0 && {
         function_call: chatRequest.function_call
+      },
+      ...chatRequest.tools !== void 0 && {
+        tools: chatRequest.tools
+      },
+      ...chatRequest.tool_choice !== void 0 && {
+        tool_choice: chatRequest.tool_choice
       }
     },
     credentials: extraMetadataRef.current.credentials,
@@ -656,6 +716,7 @@ function useChat({
   initialInput = "",
   sendExtraMessageFields,
   experimental_onFunctionCall,
+  experimental_onToolCall,
   onResponse,
   onFinish,
   onError,
@@ -719,6 +780,7 @@ function useChat({
             sendExtraMessageFields
           ),
           experimental_onFunctionCall,
+          experimental_onToolCall,
           updateChatRequest: (chatRequestParam) => {
             chatRequest = chatRequestParam;
           },
@@ -751,13 +813,21 @@ function useChat({
       streamData,
       sendExtraMessageFields,
       experimental_onFunctionCall,
+      experimental_onToolCall,
       messagesRef,
       abortControllerRef,
       generateId
     ]
   );
   const append = (0, import_react.useCallback)(
-    async (message, { options, functions, function_call, data } = {}) => {
+    async (message, {
+      options,
+      functions,
+      function_call,
+      tools,
+      tool_choice,
+      data
+    } = {}) => {
       if (!message.id) {
         message.id = generateId();
       }
@@ -766,14 +836,22 @@ function useChat({
         options,
         data,
         ...functions !== void 0 && { functions },
-        ...function_call !== void 0 && { function_call }
+        ...function_call !== void 0 && { function_call },
+        ...tools !== void 0 && { tools },
+        ...tool_choice !== void 0 && { tool_choice }
       };
       return triggerRequest(chatRequest);
     },
     [triggerRequest, generateId]
   );
   const reload = (0, import_react.useCallback)(
-    async ({ options, functions, function_call } = {}) => {
+    async ({
+      options,
+      functions,
+      function_call,
+      tools,
+      tool_choice
+    } = {}) => {
       if (messagesRef.current.length === 0)
         return null;
       const lastMessage = messagesRef.current[messagesRef.current.length - 1];
@@ -782,7 +860,9 @@ function useChat({
           messages: messagesRef.current.slice(0, -1),
           options,
           ...functions !== void 0 && { functions },
-          ...function_call !== void 0 && { function_call }
+          ...function_call !== void 0 && { function_call },
+          ...tools !== void 0 && { tools },
+          ...tool_choice !== void 0 && { tool_choice }
         };
         return triggerRequest(chatRequest2);
       }
@@ -790,7 +870,9 @@ function useChat({
         messages: messagesRef.current,
         options,
         ...functions !== void 0 && { functions },
-        ...function_call !== void 0 && { function_call }
+        ...function_call !== void 0 && { function_call },
+        ...tools !== void 0 && { tools },
+        ...tool_choice !== void 0 && { tool_choice }
       };
       return triggerRequest(chatRequest);
     },
@@ -944,6 +1026,8 @@ var getStreamedResponse2 = async (api, prompt, options, mutate, mutateStreamData
     let completion = "";
     async function readRow(promise2) {
       const { content, ui, next, ...rest } = await promise2;
+      if (rest.error)
+        throw new Error(rest.error);
       completion = content;
       mutate(completion, false);
       if (next) {
@@ -1116,7 +1200,8 @@ function experimental_useAssistant({
   threadId: threadIdParam,
   credentials,
   headers,
-  body
+  body,
+  onError
 }) {
   const [messages, setMessages] = (0, import_react3.useState)([]);
   const [input, setInput] = (0, import_react3.useState)("");
@@ -1195,12 +1280,16 @@ function experimental_useAssistant({
             break;
           }
           case "error": {
-            setError(value);
+            const errorObj = new Error(value);
+            setError(errorObj);
             break;
           }
         }
       }
     } catch (error2) {
+      if (onError && error2 instanceof Error) {
+        onError(error2);
+      }
       setError(error2);
     }
     setStatus("awaiting_message");
@@ -1209,6 +1298,7 @@ function experimental_useAssistant({
     messages,
     threadId,
     input,
+    setInput,
     handleInputChange,
     submitMessage,
     status,

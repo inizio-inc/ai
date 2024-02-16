@@ -1,5 +1,49 @@
 # ai
 
+## 2.2.35
+
+### Patch Changes
+
+- b717dad: Adding Inkeep as a stream provider
+
+## 2.2.34
+
+### Patch Changes
+
+- 2c8ffdb: cohere-stream: support AsyncIterable
+- ed1e278: Message annotations handling for all Message types
+
+## 2.2.33
+
+### Patch Changes
+
+- 8542ae7: react/use-assistant: add onError handler
+- 97039ff: OpenAIStream: Add support for the Azure OpenAI client library
+
+## 2.2.32
+
+### Patch Changes
+
+- 7851fa0: StreamData: add `annotations` and `appendMessageAnnotation` support
+
+## 2.2.31
+
+### Patch Changes
+
+- 9b89c4d: react/use-assistant: Expose setInput
+- 75751c9: ai/react: Add experimental_onToolCall to useChat.
+
+## 2.2.30
+
+### Patch Changes
+
+- ac503e0: ai/solid: add chat request options to useChat
+- b78a73e: Add GoogleGenerativeAIStream for Gemini support
+- 5220336: ai/svelte: Add experimental_onToolCall to useChat.
+- ef99062: Add support for the Anthropic message API
+- 5220336: Add experimental_onToolCall to OpenAIStream.
+- ac503e0: ai/vue: add chat request options to useChat
+
 ## 2.2.29
 
 ### Patch Changes

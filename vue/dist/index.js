@@ -152,6 +152,16 @@ var toolCallStreamPart = {
     };
   }
 };
+var messageAnnotationsStreamPart = {
+  code: "8",
+  name: "message_annotations",
+  parse: (value) => {
+    if (!Array.isArray(value)) {
+      throw new Error('"message_annotations" parts expect an array value.');
+    }
+    return { type: "message_annotations", value };
+  }
+};
 var streamParts = [
   textStreamPart,
   functionCallStreamPart,
@@ -160,7 +170,8 @@ var streamParts = [
   assistantMessageStreamPart,
   assistantControlDataStreamPart,
   dataMessageStreamPart,
-  toolCallStreamPart
+  toolCallStreamPart,
+  messageAnnotationsStreamPart
 ];
 var streamPartsByCode = {
   [textStreamPart.code]: textStreamPart,
@@ -170,7 +181,8 @@ var streamPartsByCode = {
   [assistantMessageStreamPart.code]: assistantMessageStreamPart,
   [assistantControlDataStreamPart.code]: assistantControlDataStreamPart,
   [dataMessageStreamPart.code]: dataMessageStreamPart,
-  [toolCallStreamPart.code]: toolCallStreamPart
+  [toolCallStreamPart.code]: toolCallStreamPart,
+  [messageAnnotationsStreamPart.code]: messageAnnotationsStreamPart
 };
 var StreamStringPrefixes = {
   [textStreamPart.name]: textStreamPart.code,
@@ -180,7 +192,8 @@ var StreamStringPrefixes = {
   [assistantMessageStreamPart.name]: assistantMessageStreamPart.code,
   [assistantControlDataStreamPart.name]: assistantControlDataStreamPart.code,
   [dataMessageStreamPart.name]: dataMessageStreamPart.code,
-  [toolCallStreamPart.name]: toolCallStreamPart.code
+  [toolCallStreamPart.name]: toolCallStreamPart.code,
+  [messageAnnotationsStreamPart.name]: messageAnnotationsStreamPart.code
 };
 var validCodes = streamParts.map((part) => part.code);
 var parseStreamPart = (line) => {
@@ -264,6 +277,11 @@ function createChunkDecoder(complex) {
 var COMPLEX_HEADER = "X-Experimental-Stream-Data";
 
 // shared/parse-complex-response.ts
+function assignAnnotationsToMessage(message, annotations) {
+  if (!message || !annotations || !annotations.length)
+    return message;
+  return { ...message, annotations: [...annotations] };
+}
 async function parseComplexResponse({
   reader,
   abortControllerRef,
@@ -276,6 +294,7 @@ async function parseComplexResponse({
   const prefixMap = {
     data: []
   };
+  let message_annotations = void 0;
   for await (const { type, value } of readDataStream(reader, {
     isAborted: () => (abortControllerRef == null ? void 0 : abortControllerRef.current) === null
   })) {
@@ -320,12 +339,41 @@ async function parseComplexResponse({
     if (type === "data") {
       prefixMap["data"].push(...value);
     }
-    const responseMessage = prefixMap["text"];
-    const merged = [
-      functionCallMessage,
-      toolCallMessage,
-      responseMessage
-    ].filter(Boolean);
+    let responseMessage = prefixMap["text"];
+    if (type === "message_annotations") {
+      if (!message_annotations) {
+        message_annotations = [...value];
+      } else {
+        message_annotations.push(...value);
+      }
+      functionCallMessage = assignAnnotationsToMessage(
+        prefixMap["function_call"],
+        message_annotations
+      );
+      toolCallMessage = assignAnnotationsToMessage(
+        prefixMap["tool_calls"],
+        message_annotations
+      );
+      responseMessage = assignAnnotationsToMessage(
+        prefixMap["text"],
+        message_annotations
+      );
+    }
+    if (message_annotations == null ? void 0 : message_annotations.length) {
+      const messagePrefixKeys = [
+        "text",
+        "function_call",
+        "tool_calls"
+      ];
+      messagePrefixKeys.forEach((key) => {
+        if (prefixMap[key]) {
+          prefixMap[key].annotations = [...message_annotations];
+        }
+      });
+    }
+    const merged = [functionCallMessage, toolCallMessage, responseMessage].filter(Boolean).map((message) => ({
+      ...assignAnnotationsToMessage(message, message_annotations)
+    }));
     update(merged, [...prefixMap["data"]]);
   }
   onFinish == null ? void 0 : onFinish(prefixMap);
@@ -604,7 +652,7 @@ function useChat({
   const error = (0, import_vue.ref)(void 0);
   const streamData = (0, import_vue.ref)(void 0);
   let abortController = null;
-  async function triggerRequest(messagesSnapshot, options) {
+  async function triggerRequest(messagesSnapshot, { options, data } = {}) {
     try {
       error.value = void 0;
       mutateLoading(() => true);
@@ -613,7 +661,8 @@ function useChat({
       mutate(messagesSnapshot);
       let chatRequest = {
         messages: messagesSnapshot,
-        options
+        options,
+        data
       };
       await processChatStream({
         getStreamedResponse: async () => {
@@ -632,6 +681,7 @@ function useChat({
               })
             ),
             body: {
+              data: chatRequest.data,
               ...(0, import_vue.unref)(body),
               // Use unref to unwrap the ref value
               ...options == null ? void 0 : options.body
@@ -643,9 +693,9 @@ function useChat({
             abortController: () => abortController,
             credentials,
             onResponse,
-            onUpdate(merged, data) {
+            onUpdate(merged, data2) {
               mutate([...chatRequest.messages, ...merged]);
-              streamData.value = [...existingData, ...data != null ? data : []];
+              streamData.value = [...existingData, ...data2 != null ? data2 : []];
             },
             onFinish(message) {
               mutate([...chatRequest.messages, message]);
@@ -706,15 +756,18 @@ function useChat({
     mutate(messages2);
   };
   const input = (0, import_vue.ref)(initialInput);
-  const handleSubmit = (e) => {
+  const handleSubmit = (e, options = {}) => {
     e.preventDefault();
     const inputValue = input.value;
     if (!inputValue)
       return;
-    append({
-      content: inputValue,
-      role: "user"
-    });
+    append(
+      {
+        content: inputValue,
+        role: "user"
+      },
+      options
+    );
     input.value = "";
   };
   return {

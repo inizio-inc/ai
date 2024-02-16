@@ -95,6 +95,10 @@ interface Message {
      * the tool call name and arguments. Otherwise, the field should not be set.
      */
     tool_calls?: string | ToolCall[];
+    /**
+     * Additional message-specific information added on the server via StreamData
+     */
+    annotations?: JSONValue[] | undefined;
 }
 type CreateMessage = Omit<Message, 'id'> & {
     id?: Message['id'];
@@ -113,6 +117,14 @@ type ToolCallHandler = (chatMessages: Message[], toolCalls: ToolCall[]) => Promi
 type RequestOptions = {
     headers?: Record<string, string> | Headers;
     body?: object;
+};
+type ChatRequestOptions = {
+    options?: RequestOptions;
+    functions?: Array<Function>;
+    function_call?: FunctionCall;
+    tools?: Array<Tool>;
+    tool_choice?: ToolChoice;
+    data?: Record<string, string>;
 };
 type UseChatOptions = {
     /**
@@ -262,13 +274,13 @@ type UseChatHelpers = {
      * Append a user message to the chat list. This triggers the API call to fetch
      * the assistant's response.
      */
-    append: (message: Message | CreateMessage, options?: RequestOptions) => Promise<string | null | undefined>;
+    append: (message: Message | CreateMessage, chatRequestOptions?: ChatRequestOptions) => Promise<string | null | undefined>;
     /**
      * Reload the last AI chat response for the given chat history. If the last
      * message isn't from the assistant, it will request the API to generate a
      * new response.
      */
-    reload: (options?: RequestOptions) => Promise<string | null | undefined>;
+    reload: (chatRequestOptions?: ChatRequestOptions) => Promise<string | null | undefined>;
     /**
      * Abort the current request immediately, keep the generated tokens if any.
      */
@@ -282,7 +294,7 @@ type UseChatHelpers = {
     /** The current value of the input */
     input: Ref<string>;
     /** Form submission handler to automatically reset input and append a user message  */
-    handleSubmit: (e: any) => void;
+    handleSubmit: (e: any, chatRequestOptions?: ChatRequestOptions) => void;
     /** Whether the API request is in progress */
     isLoading: Ref<boolean | undefined>;
     /** Additional data added on the server via StreamData */

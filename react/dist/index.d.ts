@@ -93,6 +93,10 @@ interface Message {
      * the tool call name and arguments. Otherwise, the field should not be set.
      */
     tool_calls?: string | ToolCall[];
+    /**
+     * Additional message-specific information added on the server via StreamData
+     */
+    annotations?: JSONValue[] | undefined;
 }
 type CreateMessage = Omit<Message, 'id'> & {
     id?: Message['id'];
@@ -270,9 +274,11 @@ declare class experimental_StreamData {
     private isClosedPromiseResolver;
     private isClosed;
     private data;
+    private messageAnnotations;
     constructor();
     close(): Promise<void>;
     append(value: JSONValue): void;
+    appendMessageAnnotation(value: JSONValue): void;
 }
 
 /**
@@ -334,7 +340,7 @@ type UseChatHelpers = {
     setInput: React.Dispatch<React.SetStateAction<string>>;
     /** An input/textarea-ready onChange handler to control the value of the input */
     handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
-    /** Form submission handler to automatically reset input and append a user message  */
+    /** Form submission handler to automatically reset input and append a user message */
     handleSubmit: (e: React.FormEvent<HTMLFormElement>, chatRequestOptions?: ChatRequestOptions) => void;
     metadata?: Object;
     /** Whether the API request is in progress */
@@ -346,7 +352,7 @@ type StreamingReactResponseAction$1 = (payload: {
     messages: Message[];
     data?: Record<string, string>;
 } & Record<string, any>) => Promise<experimental_StreamingReactResponse>;
-declare function useChat({ api, id, initialMessages, initialInput, sendExtraMessageFields, experimental_onFunctionCall, onResponse, onFinish, onError, credentials, headers, body, generateId, }?: Omit<UseChatOptions, 'api'> & {
+declare function useChat({ api, id, initialMessages, initialInput, sendExtraMessageFields, experimental_onFunctionCall, experimental_onToolCall, onResponse, onFinish, onError, credentials, headers, body, generateId, }?: Omit<UseChatOptions, 'api'> & {
     api?: string | StreamingReactResponseAction$1;
     key?: string;
 }): UseChatHelpers;
@@ -420,6 +426,10 @@ type UseAssistantHelpers = {
      */
     input: string;
     /**
+     * setState-powered method to update the input value.
+     */
+    setInput: React.Dispatch<React.SetStateAction<string>>;
+    /**
      * Handler for the `onChange` event of the input field to control the input's value.
      */
     handleInputChange: (event: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -463,8 +473,12 @@ type UseAssistantOptions = {
      * An optional, additional body object to be passed to the API endpoint.
      */
     body?: object;
+    /**
+     * An optional callback that will be called when the assistant encounters an error.
+     */
+    onError?: (error: Error) => void;
 };
-declare function experimental_useAssistant({ api, threadId: threadIdParam, credentials, headers, body, }: UseAssistantOptions): UseAssistantHelpers;
+declare function experimental_useAssistant({ api, threadId: threadIdParam, credentials, headers, body, onError, }: UseAssistantOptions): UseAssistantHelpers;
 
 export { AssistantStatus, CreateMessage, Message, StreamingReactResponseAction, UseAssistantHelpers, UseAssistantOptions, UseChatHelpers, UseChatOptions, UseCompletionHelpers, experimental_useAssistant, useChat, useCompletion };
 import * as react_jsx_runtime from 'react/jsx-runtime';

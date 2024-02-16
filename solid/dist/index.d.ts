@@ -95,6 +95,10 @@ interface Message {
      * the tool call name and arguments. Otherwise, the field should not be set.
      */
     tool_calls?: string | ToolCall[];
+    /**
+     * Additional message-specific information added on the server via StreamData
+     */
+    annotations?: JSONValue[] | undefined;
 }
 type CreateMessage = Omit<Message, 'id'> & {
     id?: Message['id'];
@@ -113,6 +117,14 @@ type ToolCallHandler = (chatMessages: Message[], toolCalls: ToolCall[]) => Promi
 type RequestOptions = {
     headers?: Record<string, string> | Headers;
     body?: object;
+};
+type ChatRequestOptions = {
+    options?: RequestOptions;
+    functions?: Array<Function>;
+    function_call?: FunctionCall;
+    tools?: Array<Tool>;
+    tool_choice?: ToolChoice;
+    data?: Record<string, string>;
 };
 type UseChatOptions = {
     /**
@@ -264,13 +276,13 @@ type UseChatHelpers = {
      * @param message The message to append
      * @param options Additional options to pass to the API call
      */
-    append: (message: Message | CreateMessage, options?: RequestOptions) => Promise<string | null | undefined>;
+    append: (message: Message | CreateMessage, chatRequestOptions?: ChatRequestOptions) => Promise<string | null | undefined>;
     /**
      * Reload the last AI chat response for the given chat history. If the last
      * message isn't from the assistant, it will request the API to generate a
      * new response.
      */
-    reload: (options?: RequestOptions) => Promise<string | null | undefined>;
+    reload: (chatRequestOptions?: ChatRequestOptions) => Promise<string | null | undefined>;
     /**
      * Abort the current request immediately, keep the generated tokens if any.
      */
@@ -285,8 +297,8 @@ type UseChatHelpers = {
     input: Accessor<string>;
     /** Signal setter to update the input value */
     setInput: Setter<string>;
-    /** Form submission handler to automatically reset input and append a user message  */
-    handleSubmit: (e: any) => void;
+    /** Form submission handler to automatically reset input and append a user message */
+    handleSubmit: (e: any, chatRequestOptions?: ChatRequestOptions) => void;
     /** Whether the API request is in progress */
     isLoading: Accessor<boolean>;
     /** Additional data added on the server via StreamData */
